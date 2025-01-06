@@ -1,4 +1,6 @@
-﻿namespace Sgl_script;
+﻿using System.Globalization;
+
+namespace Sgl_script;
 
 public class Parser(Lexer lexer)
 {
@@ -13,7 +15,7 @@ public class Parser(Lexer lexer)
                     {
                             TokenType.Identifier => Assignment(),
                             TokenType.Keyword    => Keyword(),
-                            _ => throw new Exception($"Syntax error at line {lexer.Line}: unexpected statement {_currentToken.Value}")
+                            _ => throw LanguageException.SyntaxError(lexer.Line, $"unexpected statement {_currentToken.Value}")
                     };
             
             statements.Add(statement);
@@ -37,13 +39,12 @@ public class Parser(Lexer lexer)
     {
         var keyword = _currentToken.Value;
         Consume(TokenType.Keyword);
-        
+
         return keyword switch
-                {
-                        "do" => Function(),
-                        _ => throw new Exception(
-                                     $"Syntax error at line {lexer.Line}: unexpected keyword {_currentToken.Value}")
-                };
+            {
+                "do" => Function(),
+                _    => throw LanguageException.SyntaxError(lexer.Line, $"Unexpected keyword {_currentToken.Value}")
+            };
     }
 
     private Ast.Nodes.FunctionCall Function()
@@ -103,7 +104,7 @@ public class Parser(Lexer lexer)
         {
             case TokenType.Number:
             {
-                var value = double.Parse(_currentToken.Value);
+                var value = double.Parse(_currentToken.Value, CultureInfo.InvariantCulture);
                 Consume(TokenType.Number);
                 return new Ast.Nodes.Literal<double>(value);
             }
@@ -131,7 +132,7 @@ public class Parser(Lexer lexer)
             }
 
             default:
-                throw new Exception($"Syntax error at line {lexer.Line}: Unexpected token {_currentToken.Value}");
+                throw LanguageException.SyntaxError(lexer.Line,$"Unexpected token {_currentToken.Value}");
         }
     }
 
@@ -140,6 +141,6 @@ public class Parser(Lexer lexer)
         if (_currentToken.Type == type)
             _currentToken = lexer.NextToken();
         else
-            throw new Exception($"Syntax error at line {lexer.Line}: Unexpected token {_currentToken.Value}");
+            throw LanguageException.SyntaxError(lexer.Line, $"Unexpected token {_currentToken.Value}");
     }
 }
