@@ -5,14 +5,11 @@ public class Lexer(string input)
     private int _position;
     public int Line { get; private set; } = 1;
 
-    private string PeekWhile(Predicate<char> predicate, bool throwOnError)
+    private string PeekWhile(Predicate<char> predicate, bool throwOnError = false)
     {
         int start = _position;
         while (predicate(input[_position]))
         {
-            if (input[_position] == '\n')
-                Line++;
-            
             _position++;
             
             if (_position >= input.Length)
@@ -32,15 +29,22 @@ public class Lexer(string input)
         if (_position >= input.Length)
             return new Token(TokenType.EndOfFile, "");
         
-        PeekWhile(char.IsWhiteSpace, true);
+        PeekWhile(c => c is ' ' or '\t' or '\r');
         
         if (_position >= input.Length)
             return new Token(TokenType.EndOfFile, "");
         
         char currentChar = input[_position];
 
+        if (currentChar is '\n')
+        {
+            Line++;
+            _position++;
+            return new Token(TokenType.NewLine, "");
+        }
+        
         if (char.IsDigit(currentChar))
-            return new Token(TokenType.Number, PeekWhile(c => char.IsDigit(c) || c == '.', false));
+            return new Token(TokenType.Number, PeekWhile(c => char.IsDigit(c) || c == '.'));
 
         if (currentChar == '"')
         {
@@ -52,8 +56,14 @@ public class Lexer(string input)
 
         if (char.IsLetter(currentChar))
         {
-            string literal = PeekWhile(char.IsLetterOrDigit, false);
-            return new Token(LanguageSpecification.Keywords.Contains(literal) ? TokenType.Keyword : TokenType.Identifier, literal);
+            string literal = PeekWhile(char.IsLetterOrDigit);
+            if (LanguageSpecification.Keywords.Contains(literal))
+                return new Token(TokenType.Keyword, literal);
+            
+            if (LanguageSpecification.OperatorKeywords.TryGetValue(literal, out var type))
+                return new Token(type, literal);
+            
+            return new Token(TokenType.Identifier, literal);
         }
 
         if (LanguageSpecification.SpecialTokens.TryGetValue(currentChar, out var tokenType))
@@ -65,23 +75,3 @@ public class Lexer(string input)
         throw LanguageException.SyntaxError(Line, $"Unknown symbol: {currentChar}");
     }
 }
-
-public enum TokenType
-{
-    Number,
-    String,
-    Identifier,
-    Equals,
-    BinaryOperator1,
-    BinaryOperator2,
-    OpenParenthesis,
-    CloseParenthesis,
-    OpenBracket,
-    CloseBracket,
-    CloseBrace,
-    Comma,
-    EndOfFile,
-    Keyword,
-}
-
-public record Token(TokenType Type, string Value);

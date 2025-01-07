@@ -8,7 +8,7 @@ class Program
         var reader = new StreamReader(file);
         var lexer = new Lexer(reader.ReadToEnd());
         var parser = new Parser(lexer);
-        Ast ast = parser.Parse();
+        var ast = parser.Parse();
         var visualizer = new ProgramVisualizer();
         //visualizer.Print(ast);
         var interpreter = new Interpreter();

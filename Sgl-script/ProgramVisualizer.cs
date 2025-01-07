@@ -8,16 +8,17 @@ public class ProgramVisualizer : Ast.IVisitor
     public void Print(Ast ast)
     {
         Console.WriteLine("Program");
-        for (int i = 0; i < ast.Statements.Count; i++)
-        {
-            Ast.INode statement = ast.Statements[i];
-            _indent = "";
-            _last = i == ast.Statements.Count - 1;
-            Print(statement);
-        }
+        _indent = "";
+        ast.Root.Accept(this);
     }
     
     private void Print(Ast.INode node)
+    {
+        Print();
+        node.Accept(this);
+    }
+
+    private void Print()
     {
         Console.Write(_indent);
         if (_last)
@@ -30,7 +31,6 @@ public class ProgramVisualizer : Ast.IVisitor
             Console.Write("├─");
             _indent += "| ";
         }
-        node.Accept(this);
     }
     
     public void Visit<T>(Ast.Nodes.Literal<T> node)
@@ -56,6 +56,13 @@ public class ProgramVisualizer : Ast.IVisitor
         Print(node.Right);
     }
 
+    public void Visit(Ast.Nodes.UnaryOperator node)
+    {
+        Console.WriteLine(node.Operator);
+        _last = true;
+        Print(node.Expression);
+    }
+
     public void Visit(Ast.Nodes.Assignment node)
     {
         Console.WriteLine(node.Name + " = ");
@@ -67,11 +74,50 @@ public class ProgramVisualizer : Ast.IVisitor
     public void Visit(Ast.Nodes.FunctionCall node)
     {
         Console.WriteLine(node.Name);
+        string tmp = _indent;
         for (int i = 0; i < node.Arguments.Count; i++)
         {
             Ast.INode argument = node.Arguments[i];
             _last = i == node.Arguments.Count - 1;
+            _indent = tmp;
             Print(argument);
+        }
+    }
+
+    public void Visit(Ast.Nodes.Conditional node)
+    {
+        Console.WriteLine("Conditional");
+        _indent += "  ";
+        
+        _last = false;
+        string tmp = _indent;
+        Print(node.Condition);
+        
+        bool hasElse = node.FalseBranch is not null;
+        _indent = tmp;
+        _last = !hasElse;
+        Print();
+        Console.WriteLine("True branch");
+        node.TrueBranch.Accept(this);
+        
+        if (hasElse)
+        {
+            _indent = tmp;
+            Print();
+            Console.WriteLine("False branch");
+            node.FalseBranch.Accept(this);
+        }
+    }
+
+    public void Visit(Ast.Nodes.Compound node)
+    {
+        string tmp = _indent;
+        for (int i = 0; i < node.Statements.Count; i++)
+        {
+            Ast.INode statement = node.Statements[i];
+            _indent = tmp;
+            _last = i == node.Statements.Count - 1;
+            Print(statement);
         }
     }
 }

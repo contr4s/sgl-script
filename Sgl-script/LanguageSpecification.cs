@@ -2,6 +2,8 @@
 
 public static class LanguageSpecification
 {
+    public const double Epsilon = 1e-10;
+    
     public static Dictionary<char, TokenType> SpecialTokens { get; } = new Dictionary<char, TokenType>
         {
             ['='] = TokenType.Equals,
@@ -11,12 +13,38 @@ public static class LanguageSpecification
             [']'] = TokenType.CloseBracket,
             ['}'] = TokenType.CloseBrace,
             [','] = TokenType.Comma,
-            ['+'] = TokenType.BinaryOperator1,
-            ['-'] = TokenType.BinaryOperator1,
-            ['*'] = TokenType.BinaryOperator2,
-            ['/'] = TokenType.BinaryOperator2,
-            ['%'] = TokenType.BinaryOperator2,
+            ['.'] = TokenType.Dot,
+            ['-'] = TokenType.Minus,
+            ['+'] = TokenType.BinaryOperator,
+            ['*'] = TokenType.BinaryOperator,
+            ['/'] = TokenType.BinaryOperator,
+            ['%'] = TokenType.BinaryOperator,
+            ['>'] = TokenType.BinaryOperator,
+            ['<'] = TokenType.BinaryOperator,
         };
+    
+    public static Dictionary<string, TokenType> OperatorKeywords { get; } = new()
+    {
+        ["not"] = TokenType.UnaryOperator,
+        ["and"] = TokenType.BinaryOperator,
+        ["or"] = TokenType.BinaryOperator
+    };
+    
+    public static Dictionary<string, int> OperatorsPriority { get; } = new()
+    {
+        ["not"] = 1,
+        ["*"] = 2,
+        ["/"] = 2,
+        ["%"] = 2,
+        ["+"] = 3,
+        ["-"] = 3,
+        [">"] = 4,
+        ["<"] = 4,
+        ["="] = 5,
+        ["and"] = 6,
+        ["or"] = 7,
+    };
+    public const int MaxPriority = 9;
 
     public static HashSet<string> Keywords { get; } = ["do", "if", "else", "for"];
 

@@ -6,22 +6,31 @@ public class Parser(Lexer lexer)
 {
     private Token _currentToken = lexer.NextToken();
 
-    public Ast Parse()
+    public Ast Parse() => new (Compound(TokenType.EndOfFile));
+    
+    private Ast.Nodes.Compound Compound(TokenType endToken)
     {
         List<Ast.INode> statements = [];
-        while (_currentToken.Type != TokenType.EndOfFile)
+        while (_currentToken.Type != endToken)
         {
-            var statement = _currentToken.Type switch 
+            if (_currentToken.Type == TokenType.NewLine)
+            {
+                Consume(TokenType.NewLine);
+            }
+            else
+            {
+                var statement = _currentToken.Type switch
                     {
-                            TokenType.Identifier => Assignment(),
-                            TokenType.Keyword    => Keyword(),
-                            _ => throw LanguageException.SyntaxError(lexer.Line, $"unexpected statement {_currentToken.Value}")
+                        TokenType.Identifier => Assignment(),
+                        TokenType.Keyword    => Keyword(),
+                        _                    => throw LanguageException.SyntaxError(lexer.Line, $"unexpected statement {_currentToken.Value}")
                     };
-            
-            statements.Add(statement);
+                statements.Add(statement);
+            }
         }
         
-        return new Ast(statements);
+        Consume(endToken);
+        return new Ast.Nodes.Compound(statements);
     }
     
     private Ast.Nodes.Assignment Assignment()
@@ -43,6 +52,7 @@ public class Parser(Lexer lexer)
         return keyword switch
             {
                 "do" => Function(),
+                "if" => Conditional(),
                 _    => throw LanguageException.SyntaxError(lexer.Line, $"Unexpected keyword {_currentToken.Value}")
             };
     }
@@ -56,9 +66,9 @@ public class Parser(Lexer lexer)
         while (true)
         {
             arguments.Add(Expression());
-            if (_currentToken.Type == TokenType.CloseParenthesis)
+            if (_currentToken.Type == TokenType.NewLine)
             {
-                Consume(TokenType.CloseParenthesis);
+                Consume(TokenType.NewLine);
                 break;
             }
 
@@ -67,35 +77,50 @@ public class Parser(Lexer lexer)
         
         return new Ast.Nodes.FunctionCall(functionName, arguments);
     }
-
-    private Ast.INode Expression()
+    
+    private Ast.Nodes.Conditional Conditional()
     {
-        var left = Term();
+        var condition = Expression();
+        var trueBranch = Compound(TokenType.CloseBrace);
 
-        while (_currentToken.Type == TokenType.BinaryOperator1)
+        SkipWhitespaces();
+        
+        Ast.Nodes.Compound falseBranch = null;
+        if (_currentToken is {Type: TokenType.Keyword, Value: "else"})
         {
-            string operatorSymbol = _currentToken.Value;
-            Consume(_currentToken.Type);
-            var right = Term();
-            left = new Ast.Nodes.BinaryOperator(left, operatorSymbol, right);
+            Consume(TokenType.Keyword);
+            falseBranch = Compound(TokenType.CloseBrace);
         }
-
-        return left;
+        
+        return new Ast.Nodes.Conditional(condition, trueBranch, falseBranch);
     }
 
-    private Ast.INode Term()
+    private void SkipWhitespaces()
     {
-        var node = Factor();
+        while (_currentToken.Type is TokenType.NewLine)
+        {
+            Consume(TokenType.NewLine);
+        }
+    }
 
-        while (_currentToken.Type == TokenType.BinaryOperator2)
+    private Ast.INode Expression(int priority = LanguageSpecification.MaxPriority)
+    {
+        if (priority <= 0)
+            return Factor();
+
+        priority--;
+        var expression = Expression(priority);
+        
+        while (LanguageSpecification.OperatorsPriority.TryGetValue(_currentToken.Value, out int p) && p < priority)
         {
             string operatorSymbol = _currentToken.Value;
             Consume(_currentToken.Type);
-            var right = Factor();
-            node = new Ast.Nodes.BinaryOperator(node, operatorSymbol, right);
+            
+            var right = Expression(priority);
+            expression = new Ast.Nodes.BinaryOperator(expression, operatorSymbol, right);
         }
 
-        return node;
+        return expression;
     }
 
     private Ast.INode Factor() 
@@ -111,14 +136,14 @@ public class Parser(Lexer lexer)
 
             case TokenType.String:
             {
-                var value = _currentToken.Value;
+                string value = _currentToken.Value;
                 Consume(TokenType.String);
                 return new Ast.Nodes.Literal<string>(value);
             }
 
             case TokenType.Identifier:
             {
-                var name = _currentToken.Value;
+                string name = _currentToken.Value;
                 Consume(TokenType.Identifier);
                 return new Ast.Nodes.Variable(name);
             }
@@ -129,6 +154,13 @@ public class Parser(Lexer lexer)
                 var node = Expression();
                 Consume(TokenType.CloseParenthesis);
                 return node;
+            }
+
+            case TokenType.Minus or TokenType.UnaryOperator:
+            {
+                string unaryOperator = _currentToken.Value;
+                Consume(_currentToken.Type);
+                return new Ast.Nodes.UnaryOperator(unaryOperator, Factor());
             }
 
             default:
