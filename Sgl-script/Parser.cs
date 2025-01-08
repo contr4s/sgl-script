@@ -2,9 +2,9 @@
 
 namespace Sgl_script;
 
-public class Parser(Lexer lexer)
+public class Parser(Lexer lexer, ExecutionContext context)
 {
-    private Token _currentToken = lexer.NextToken();
+    private Token _currentToken = lexer.PopNext();
 
     public Ast Parse() => new (Compound(TokenType.EndOfFile));
     
@@ -21,7 +21,7 @@ public class Parser(Lexer lexer)
             {
                 var statement = _currentToken.Type switch
                     {
-                        TokenType.Identifier => Assignment(),
+                        TokenType.Identifier => IdentifierAction(),
                         TokenType.Keyword    => Keyword(),
                         _                    => throw LanguageException.SyntaxError(lexer.Line, $"unexpected statement {_currentToken.Value}")
                     };
@@ -32,16 +32,44 @@ public class Parser(Lexer lexer)
         Consume(endToken);
         return new Ast.Nodes.Compound(statements);
     }
-    
-    private Ast.Nodes.Assignment Assignment()
+
+    private Ast.INode IdentifierAction()
     {
-        string variableName = _currentToken.Value;
+        string identifier = _currentToken.Value;
         Consume(TokenType.Identifier);
+
+        if (context.HasFunction(identifier))
+            return new Ast.Nodes.FunctionCall(identifier, GetArguments());
+        
+        return _currentToken.Type switch
+            {
+                TokenType.Equals => Assignment(identifier),
+                TokenType.Dot    => Method(new Ast.Nodes.Variable(identifier)),
+                _                => throw LanguageException.SyntaxError(lexer.Line, $"unexpected statement {_currentToken.Value}")
+            };
+    }
+    
+    private Ast.Nodes.Assignment Assignment(string variable)
+    {
         Consume(TokenType.Equals);
         
-        var value = Expression();
-        
-        return new Ast.Nodes.Assignment(variableName, value);
+        string identifier = _currentToken.Value;
+        Ast.INode value;
+        if (context.HasFunction(identifier))
+        {
+            Consume(TokenType.Identifier);
+            value = new Ast.Nodes.FunctionCall(identifier, GetArguments());
+        }
+        else if (lexer.PeekNext().Type == TokenType.Dot)
+        {
+            Consume(TokenType.Identifier);
+            value = Method(new Ast.Nodes.Variable(identifier));
+        }
+        else
+        {
+            value = Expression();
+        }
+        return new Ast.Nodes.Assignment(variable, value);
     }
     
     private Ast.INode Keyword()
@@ -51,31 +79,40 @@ public class Parser(Lexer lexer)
 
         return keyword switch
             {
-                "do" => Function(),
                 "if" => Conditional(),
                 _    => throw LanguageException.SyntaxError(lexer.Line, $"Unexpected keyword {_currentToken.Value}")
             };
     }
-
-    private Ast.Nodes.FunctionCall Function()
+    
+    private List<Ast.INode> GetArguments()
     {
-        string functionName = _currentToken.Value;
-        Consume(TokenType.Identifier);
-        
         var arguments = new List<Ast.INode>();
         while (true)
         {
-            arguments.Add(Expression());
-            if (_currentToken.Type == TokenType.NewLine)
+            if (_currentToken.Type is TokenType.NewLine or TokenType.EndOfFile)
             {
-                Consume(TokenType.NewLine);
+                Consume(_currentToken.Type);
                 break;
             }
 
-            Consume(TokenType.Comma);
+            arguments.Add(Expression());
+            if (_currentToken.Type is not (TokenType.NewLine or TokenType.EndOfFile))
+                Consume(TokenType.Comma);
         }
+
+        return arguments;
+    }
+
+    private Ast.Nodes.MethodCall Method(Ast.Nodes.Variable variable)
+    {
+        Consume(TokenType.Dot);
+        string methodName = _currentToken.Value;
+        Consume(TokenType.Identifier);
         
-        return new Ast.Nodes.FunctionCall(functionName, arguments);
+        if (!context.HasMethod(methodName))
+            throw LanguageException.SyntaxError(lexer.Line, $"Unexpected method {methodName}");
+        
+        return new Ast.Nodes.MethodCall(variable, methodName, GetArguments());
     }
     
     private Ast.Nodes.Conditional Conditional()
@@ -155,7 +192,43 @@ public class Parser(Lexer lexer)
                 Consume(TokenType.CloseParenthesis);
                 return node;
             }
+            
+            case TokenType.OpenBracket:
+            {
+                Consume(TokenType.OpenBracket);
+                var elements = new List<Ast.INode>();
+                while (true)
+                {
+                    if (_currentToken.Type == TokenType.CloseBracket)
+                    {
+                        Consume(TokenType.CloseBracket);
+                        return new Ast.Nodes.Array(elements);
+                    }
+                    
+                    elements.Add(Expression());
+                    if (_currentToken.Type != TokenType.CloseBracket)
+                        Consume(TokenType.Comma);
+                }
+            }
 
+            case TokenType.Range:
+            {
+                var value = _currentToken.Value;
+                Consume(TokenType.Range);
+
+                string[] split = value.Split('.', StringSplitOptions.RemoveEmptyEntries);
+                if (split.Length < 1 || !int.TryParse(split[0], out int start))
+                    throw LanguageException.SyntaxError(lexer.Line, $"Invalid range start {value}");
+                if (split.Length < 2 || !int.TryParse(split[1], out int end))
+                    throw LanguageException.SyntaxError(lexer.Line, $"Invalid range end {value}");
+
+                IEnumerable<int> range = start <= end
+                                             ? Enumerable.Range(start, end - start + 1)
+                                             : Enumerable.Range(end, start - end + 1).Reverse();
+
+                return new Ast.Nodes.Array(range.Select(x => new Ast.Nodes.Literal<double>(x)).ToList());
+            }
+                
             case TokenType.Minus or TokenType.UnaryOperator:
             {
                 string unaryOperator = _currentToken.Value;
@@ -171,7 +244,7 @@ public class Parser(Lexer lexer)
     private void Consume(TokenType type)
     {
         if (_currentToken.Type == type)
-            _currentToken = lexer.NextToken();
+            _currentToken = lexer.PopNext();
         else
             throw LanguageException.SyntaxError(lexer.Line, $"Unexpected token {_currentToken.Value}");
     }

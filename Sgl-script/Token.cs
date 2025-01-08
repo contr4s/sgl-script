@@ -21,4 +21,5 @@ public enum TokenType
     EndOfFile,
     NewLine,
     Keyword,
+    Range,
 }

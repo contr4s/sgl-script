@@ -38,6 +38,20 @@ public class ProgramVisualizer : Ast.IVisitor
         Console.WriteLine(node);
     }
 
+    public void Visit(Ast.Nodes.Array node)
+    {
+        Console.WriteLine("Array");
+        _indent += "  ";
+        string tmp = _indent;
+        for (int i = 0; i < node.Elements.Count; i++)
+        {
+            Ast.INode child = node.Elements[i];
+            _last = i == node.Elements.Count - 1;
+            _indent = tmp;
+            Print(child);
+        }
+    }
+
     public void Visit(Ast.Nodes.Variable node)
     {
         Console.WriteLine(node.Name);
@@ -65,7 +79,7 @@ public class ProgramVisualizer : Ast.IVisitor
 
     public void Visit(Ast.Nodes.Assignment node)
     {
-        Console.WriteLine(node.Name + " = ");
+        Console.WriteLine(node.Variable + " = ");
         _indent += "  ";
         _last = true;
         Print(node.Expression);
@@ -74,6 +88,19 @@ public class ProgramVisualizer : Ast.IVisitor
     public void Visit(Ast.Nodes.FunctionCall node)
     {
         Console.WriteLine(node.Name);
+        string tmp = _indent;
+        for (int i = 0; i < node.Arguments.Count; i++)
+        {
+            Ast.INode argument = node.Arguments[i];
+            _last = i == node.Arguments.Count - 1;
+            _indent = tmp;
+            Print(argument);
+        }
+    }
+
+    public void Visit(Ast.Nodes.MethodCall node)
+    {
+        Console.WriteLine($"{node.Variable.Name}.{node.Name}");
         string tmp = _indent;
         for (int i = 0; i < node.Arguments.Count; i++)
         {

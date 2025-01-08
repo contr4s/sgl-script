@@ -1,9 +1,8 @@
 ﻿namespace Sgl_script;
 
-public class Interpreter : Ast.IVisitor
+public class Interpreter(ExecutionContext context) : Ast.IVisitor
 {
     private Dictionary<string, object> _variables = new();
-    private Dictionary<string, Func<List<object>, object>> _functions = new(LanguageSpecification.StandardFunctions);
     
     private Stack<object> _stack = new();
 
@@ -16,6 +15,20 @@ public class Interpreter : Ast.IVisitor
     {
         if (node.Value is not null)
             _stack.Push(node.Value);
+    }
+
+    public void Visit(Ast.Nodes.Array node)
+    {
+        var array = new List<object>();
+        foreach (var el in node.Elements)
+            el.Accept(this);
+
+        for (int i = 0; i < node.Elements.Count; i++)
+        {
+            array.Add(_stack.Pop());
+        }
+        array.Reverse();
+        _stack.Push(array);
     }
 
     public void Visit(Ast.Nodes.Variable node)
@@ -41,8 +54,13 @@ public class Interpreter : Ast.IVisitor
                 "/" when left is double l && right is double r => l / r,
                 "%" when left is double l && right is double r => l % r,
 
+                "+" when left is List<object> l && right is List<object> r => Add(l, r),
+                "-" when left is List<object> l && right is List<object> r => Subtract(l, r),
+                "+" when left is List<object> l                         => Add(l, right),
+                "-" when left is List<object> l                         => Subtract(l, right),
+                
                 "+" when left is string || right is string => left.ToString() + right,
-                "-" when left is string                    => left.ToString().Replace(right.ToString(), ""),
+                "-" when left is string => left.ToString().Replace(right.ToString(), ""),
 
                 "and" when left is bool l && right is bool r   => l && r,
                 "or" when left is bool l && right is bool r    => l || r,
@@ -62,6 +80,37 @@ public class Interpreter : Ast.IVisitor
                 _                 => throw LanguageException.RuntimeError($"Unknown operator {node.Operator}")
             };
         _stack.Push(res);
+    }
+    
+    private List<object> Add(List<object> left, object right)
+    {
+        var clone = left.ToList();
+        clone.Add(right);
+        return clone;
+    }
+    
+    private List<object> Add(List<object> left, List<object> right)
+    {
+        var clone = left.ToList();
+        clone.AddRange(right);
+        return clone;
+    }
+    
+    private List<object> Subtract(List<object> left, object right)
+    {
+        var clone = left.ToList();
+        clone.Remove(right);
+        return clone;
+    }
+    
+    private List<object> Subtract(List<object> left, List<object> right)
+    {
+        var clone = left.ToList();
+        foreach (object el in right)
+        {
+            clone.Remove(el);
+        }
+        return clone;
     }
 
     public void Visit(Ast.Nodes.UnaryOperator node)
@@ -84,28 +133,40 @@ public class Interpreter : Ast.IVisitor
     public void Visit(Ast.Nodes.Assignment node)
     {
         node.Expression.Accept(this);
-        _variables[node.Name] = _stack.Pop();
+        _variables[node.Variable] = _stack.Pop();
     }
 
     public void Visit(Ast.Nodes.FunctionCall node)
     {
+        if (!context.HasFunction(node.Name))
+            throw LanguageException.RuntimeError($"Function {node.Name} is not defined");
+        
+        object? res = context.ExecuteFunction(node.Name, PrepareArguments(node.Arguments));
+        if (res is not null)
+            _stack.Push(res);
+    }
+
+    private List<object> PrepareArguments(IReadOnlyList<Ast.INode> arguments)
+    {
         List<object> args = [];
-        foreach (var argument in node.Arguments)
+        foreach (var argument in arguments)
         {
             argument.Accept(this);
             args.Add(_stack.Pop());
         }
+
+        return args;
+    }
+
+    public void Visit(Ast.Nodes.MethodCall node)
+    {
+        if (!context.HasMethod(node.Name))
+            throw LanguageException.RuntimeError($"Method {node.Name} is not defined");
         
-        if (_functions.TryGetValue(node.Name, out var func))
-        {
-            object res = func(args);
-            if (res is not null)
-                _stack.Push(res);
-        }
-        else
-        {
-            throw LanguageException.RuntimeError($"Function {node.Name} is not defined");
-        }
+        node.Variable.Accept(this);
+        object? res = context.ExecuteMethod(_stack.Pop(), node.Name, PrepareArguments(node.Arguments));
+        if (res is not null)
+            _stack.Push(res);
     }
 
     public void Visit(Ast.Nodes.Conditional node)
