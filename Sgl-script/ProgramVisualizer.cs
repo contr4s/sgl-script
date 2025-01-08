@@ -147,4 +147,24 @@ public class ProgramVisualizer : Ast.IVisitor
             Print(statement);
         }
     }
+
+    public void Visit(Ast.Nodes.Loop node)
+    {
+        Console.WriteLine($"Loop on {node.IteratorName}");
+        _indent += "  ";
+        _last = false;
+        string tmp = _indent;
+        
+        Print();
+        _last = true;
+        Console.WriteLine("Iterable");
+        _indent += "  ";
+        Print(node.Iterable);
+        
+        _last = true;
+        _indent = tmp;
+        Print();
+        Console.WriteLine("Body");
+        node.Body.Accept(this);
+    }
 }

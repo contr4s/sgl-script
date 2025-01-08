@@ -52,7 +52,11 @@ public class Parser(Lexer lexer, ExecutionContext context)
     private Ast.Nodes.Assignment Assignment(string variable)
     {
         Consume(TokenType.Equals);
-        
+        return new Ast.Nodes.Assignment(variable, Term());
+    }
+
+    private Ast.INode Term()
+    {
         string identifier = _currentToken.Value;
         Ast.INode value;
         if (context.HasFunction(identifier))
@@ -69,9 +73,10 @@ public class Parser(Lexer lexer, ExecutionContext context)
         {
             value = Expression();
         }
-        return new Ast.Nodes.Assignment(variable, value);
+
+        return value;
     }
-    
+
     private Ast.INode Keyword()
     {
         var keyword = _currentToken.Value;
@@ -80,6 +85,7 @@ public class Parser(Lexer lexer, ExecutionContext context)
         return keyword switch
             {
                 "if" => Conditional(),
+                "for" => Loop(),
                 _    => throw LanguageException.SyntaxError(lexer.Line, $"Unexpected keyword {_currentToken.Value}")
             };
     }
@@ -117,7 +123,7 @@ public class Parser(Lexer lexer, ExecutionContext context)
     
     private Ast.Nodes.Conditional Conditional()
     {
-        var condition = Expression();
+        var condition = Term();
         var trueBranch = Compound(TokenType.CloseBrace);
 
         SkipWhitespaces();
@@ -130,6 +136,18 @@ public class Parser(Lexer lexer, ExecutionContext context)
         }
         
         return new Ast.Nodes.Conditional(condition, trueBranch, falseBranch);
+    }
+    
+    private Ast.Nodes.Loop Loop()
+    {
+        var iterator = _currentToken.Value;
+        Consume(TokenType.Identifier);
+        
+        if (_currentToken.Value != "in")
+            throw LanguageException.SyntaxError(lexer.Line, $"For loop must have 'in' keyword");
+        Consume(TokenType.Keyword);
+
+        return new Ast.Nodes.Loop(iterator, Expression(), Compound(TokenType.CloseBrace));
     }
 
     private void SkipWhitespaces()
@@ -195,20 +213,7 @@ public class Parser(Lexer lexer, ExecutionContext context)
             
             case TokenType.OpenBracket:
             {
-                Consume(TokenType.OpenBracket);
-                var elements = new List<Ast.INode>();
-                while (true)
-                {
-                    if (_currentToken.Type == TokenType.CloseBracket)
-                    {
-                        Consume(TokenType.CloseBracket);
-                        return new Ast.Nodes.Array(elements);
-                    }
-                    
-                    elements.Add(Expression());
-                    if (_currentToken.Type != TokenType.CloseBracket)
-                        Consume(TokenType.Comma);
-                }
+                return Array();
             }
 
             case TokenType.Range:
@@ -238,6 +243,27 @@ public class Parser(Lexer lexer, ExecutionContext context)
 
             default:
                 throw LanguageException.SyntaxError(lexer.Line,$"Unexpected token {_currentToken.Value}");
+        }
+    }
+
+    private Ast.INode Array()
+    {
+        Consume(TokenType.OpenBracket);
+        var elements = new List<Ast.INode>();
+        while (true)
+        {
+            if (_currentToken.Type is TokenType.NewLine or TokenType.EndOfFile)
+                throw LanguageException.SyntaxError(lexer.Line, $"Array must be closed with ]");
+            
+            if (_currentToken.Type == TokenType.CloseBracket)
+            {
+                Consume(TokenType.CloseBracket);
+                return new Ast.Nodes.Array(elements);
+            }
+                    
+            elements.Add(Expression());
+            if (_currentToken.Type != TokenType.CloseBracket)
+                Consume(TokenType.Comma);
         }
     }
 

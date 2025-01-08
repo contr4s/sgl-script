@@ -48,7 +48,7 @@ public static class LanguageSpecification
     };
     public const int MaxPriority = 9;
 
-    public static HashSet<string> Keywords { get; } = ["if", "else", "for"];
+    public static HashSet<string> Keywords { get; } = ["if", "else", "for", "in"];
 
     public static Dictionary<string, Func<List<object>, object>> StandardFunctions { get; } = new()
         {
@@ -56,7 +56,11 @@ public static class LanguageSpecification
             {
                 Console.WriteLine(string.Join(" ", args.Select(NiceToString)));
                 return null!;
-            }
+            },
+            ["IsNumber"] = args => args.All(o => o is double),
+            ["IsString"] = args => args.All(o => o is string),
+            ["IsArray"] = args => args.All(o => o is IList),
+            ["IsBool"] = args => args.All(o => o is bool),
         };
 
     private static string NiceToString(object o)

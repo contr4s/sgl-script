@@ -21,6 +21,7 @@ public record Ast(Ast.Nodes.Compound Root)
         void Visit(Nodes.MethodCall node);
         void Visit(Nodes.Conditional node);
         void Visit(Nodes.Compound node);
+        void Visit(Nodes.Loop node);
     }
     
     public static class Nodes
@@ -71,6 +72,11 @@ public record Ast(Ast.Nodes.Compound Root)
         }
         
         public record Compound(IReadOnlyList<INode> Statements) : INode
+        {
+            public void Accept(IVisitor visitor) => visitor.Visit(this);
+        }
+        
+        public record Loop(string IteratorName, INode Iterable, Compound Body) : INode
         {
             public void Accept(IVisitor visitor) => visitor.Visit(this);
         }

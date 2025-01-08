@@ -189,4 +189,19 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
             statement.Accept(this);
         }
     }
+
+    public void Visit(Ast.Nodes.Loop node)
+    {
+        node.Iterable.Accept(this);
+        var iterable = _stack.Pop();
+        if (iterable is not List<object> list)
+            throw LanguageException.RuntimeError($"Cannot iterate over {iterable}");
+
+        foreach (var el in list)
+        {
+            _stack.Push(el);
+            _variables[node.IteratorName] = _stack.Pop();
+            node.Body.Accept(this);
+        }
+    }
 }
