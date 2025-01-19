@@ -73,6 +73,9 @@ public class Lexer(string input)
             if (LanguageSpecification.OperatorKeywords.TryGetValue(literal, out var type))
                 return new Token(type, literal);
             
+            if (LanguageSpecification.Types.Contains(literal))
+                return new Token(TokenType.TypeDef, literal);
+            
             return new Token(TokenType.Identifier, literal);
         }
 
@@ -125,6 +128,9 @@ public class Lexer(string input)
             
             if (LanguageSpecification.OperatorKeywords.TryGetValue(literal, out var type))
                 return new Token(type, literal);
+            
+            if (LanguageSpecification.Types.Contains(literal))
+                return new Token(TokenType.TypeDef, literal);
             
             return new Token(TokenType.Identifier, literal);
         }

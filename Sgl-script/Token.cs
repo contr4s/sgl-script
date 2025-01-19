@@ -22,4 +22,6 @@ public enum TokenType
     NewLine,
     Keyword,
     Range,
+    Colon,
+    TypeDef,
 }

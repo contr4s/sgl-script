@@ -23,6 +23,7 @@ public static class LanguageSpecification
             ['%'] = TokenType.BinaryOperator,
             ['>'] = TokenType.BinaryOperator,
             ['<'] = TokenType.BinaryOperator,
+            [':'] = TokenType.Colon,
         };
     
     public static Dictionary<string, TokenType> OperatorKeywords { get; } = new()
@@ -48,7 +49,8 @@ public static class LanguageSpecification
     };
     public const int MaxPriority = 9;
 
-    public static HashSet<string> Keywords { get; } = ["if", "else", "for", "in"];
+    public static HashSet<string> Keywords { get; } = ["if", "else", "for", "in", "with"];
+    public static HashSet<string> Types { get; } = ["number", "string", "bool", "array", "object"];
 
     public static Dictionary<string, Func<List<object>, object>> StandardFunctions { get; } = new()
         {

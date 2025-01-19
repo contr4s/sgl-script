@@ -86,6 +86,7 @@ public class Parser(Lexer lexer, ExecutionContext context)
             {
                 "if" => Conditional(),
                 "for" => Loop(),
+                "with" => WithExpression(),
                 _    => throw LanguageException.SyntaxError(lexer.Line, $"Unexpected keyword {_currentToken.Value}")
             };
     }
@@ -137,7 +138,15 @@ public class Parser(Lexer lexer, ExecutionContext context)
         
         return new Ast.Nodes.Conditional(condition, trueBranch, falseBranch);
     }
-    
+
+    private void SkipWhitespaces()
+    {
+        while (_currentToken.Type is TokenType.NewLine)
+        {
+            Consume(TokenType.NewLine);
+        }
+    }
+
     private Ast.Nodes.Loop Loop()
     {
         var iterator = _currentToken.Value;
@@ -150,14 +159,7 @@ public class Parser(Lexer lexer, ExecutionContext context)
         return new Ast.Nodes.Loop(iterator, Expression(), Compound(TokenType.CloseBrace));
     }
 
-    private void SkipWhitespaces()
-    {
-        while (_currentToken.Type is TokenType.NewLine)
-        {
-            Consume(TokenType.NewLine);
-        }
-    }
-
+    
     private Ast.INode Expression(int priority = LanguageSpecification.MaxPriority)
     {
         if (priority <= 0)
@@ -227,8 +229,7 @@ public class Parser(Lexer lexer, ExecutionContext context)
                 if (split.Length < 2 || !int.TryParse(split[1], out int end))
                     throw LanguageException.SyntaxError(lexer.Line, $"Invalid range end {value}");
 
-                IEnumerable<int> range = start <= end
-                                             ? Enumerable.Range(start, end - start + 1)
+                IEnumerable<int> range = start <= end ? Enumerable.Range(start, end - start + 1)
                                              : Enumerable.Range(end, start - end + 1).Reverse();
 
                 return new Ast.Nodes.Array(range.Select(x => new Ast.Nodes.Literal<double>(x)).ToList());
@@ -266,12 +267,46 @@ public class Parser(Lexer lexer, ExecutionContext context)
                 Consume(TokenType.Comma);
         }
     }
+    
+    private Ast.INode WithExpression()
+    {
+        List<Ast.INode> statements = [];
+        while (true)
+        {
+            var name = _currentToken.Value;
+            Consume(TokenType.Identifier);
+            Consume(TokenType.Colon);
+            
+            var type = _currentToken.Value;
+            Consume(TokenType.TypeDef);
+
+            Ast.INode value = type switch
+                {
+                    "number" => GetFromContext<double>(),
+                    "string" => GetFromContext<string>(),
+                    "bool"   => GetFromContext<bool>(),
+                    "array"  => GetFromContext<List<object>>(),
+                    "object" => GetFromContext<object>(),
+                    _        => throw LanguageException.SyntaxError(lexer.Line, $"Invalid type {type}")
+                };
+            statements.Add(new Ast.Nodes.Assignment(name, value));
+            
+            if (_currentToken.Type is TokenType.NewLine)
+            {
+                return new Ast.Nodes.Compound(statements);
+            }
+
+            Consume(TokenType.Comma);
+        }
+    }
+
+    private Ast.Nodes.Literal<T> GetFromContext<T>() => new(context.ConsumeArgument<T>());
 
     private void Consume(TokenType type)
     {
         if (_currentToken.Type == type)
             _currentToken = lexer.PopNext();
         else
-            throw LanguageException.SyntaxError(lexer.Line, $"Unexpected token {_currentToken.Value}");
+            throw LanguageException.SyntaxError(lexer.Line, $"Unexpected token {_currentToken.Value}, expected: {type}");
     }
 }

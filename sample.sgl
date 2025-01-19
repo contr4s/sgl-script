@@ -1,0 +1,66 @@
+﻿a = (5 + 5) * 3
+b = " " + "яблок"
+c = 1 + 2 * 3
+d = a + c
+Print "Было", a + b, "добавили", c + b, "стало", d + b
+
+a = -2
+b = a / -2
+c = -(a + b) * -2
+Print a, b, c, a > b, not (a > b), a = c and not (a < c)
+
+d = a < b and a = c
+if a > b or not d
+    Print "first"
+} else 
+    if d
+        Print "second"
+    } else 
+        Print "third"
+    }
+    Print "fourth"
+}
+
+a = [1, -3, "ten"]
+Print a, a - -3, a - [1, "ten"]
+Print a, a + 2, a + [4, "five"]
+b = 1..5
+Print b, b + 9..8, b - 2..4
+
+c = b.At 2
+d = b.Count
+Print c, d
+
+b.Add a
+b.Remove 5
+b.Insert 2, "cat"
+b.RemoveAt 0
+a.Clear
+c = b.Contains a
+d = b.ContainsAll 2, 3, 4
+Print a, b, c, d
+
+for i in 5..7
+    Print i
+}
+for i in b
+    if IsNumber i
+        Print "num", i % 2
+    }
+    if IsString i
+        Print "str", i - "c"
+    }
+    if IsArray i
+        c = i.Count
+        Print "arr", c
+    }
+}
+
+with n: number, m: number, b: bool, s: string
+if b
+    a = n % m
+}
+else
+    a = n / m
+}
+Print s + a, n, m, b

@@ -1,9 +1,13 @@
-﻿namespace Sgl_script;
+﻿using System.Globalization;
+
+namespace Sgl_script;
 
 public class ExecutionContext
 {
-    private Dictionary<string, Func<List<object>, object>> _functions = new(LanguageSpecification.StandardFunctions);
-    private Dictionary<string, Func<object, List<object>, object>> _methods = new(LanguageSpecification.StandardMethods);
+    private readonly Dictionary<string, Func<List<object>, object>> _functions = new(LanguageSpecification.StandardFunctions);
+    private readonly Dictionary<string, Func<object, List<object>, object>> _methods = new(LanguageSpecification.StandardMethods);
+    
+    private readonly Queue<object> _arguments = [];
 
     public void RegisterFunction(string name, Func<List<object>, object> function)
     {
@@ -20,4 +24,20 @@ public class ExecutionContext
     }
     public bool HasMethod(string name) => _methods.ContainsKey(name);
     public object? ExecuteMethod(object obj, string name, List<object> arguments) => _methods[name](obj, arguments);
+    
+    public void AddArgument(object arg) => _arguments.Enqueue(arg);
+
+    public T ConsumeArgument<T>()
+    {
+        object arg = _arguments.Dequeue();
+        if (arg is T t)
+            return t;
+
+        if (arg is IConvertible convertible)
+        {
+            return (T)convertible.ToType(typeof(T), CultureInfo.InvariantCulture);
+        }
+        
+        throw LanguageException.ContextError($"argument is not of type {typeof(T)}");
+    }
 }
