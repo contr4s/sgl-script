@@ -1,10 +1,15 @@
-﻿namespace Sgl_script;
+﻿using System.Globalization;
+
+namespace Sgl_script;
 
 public class Interpreter(ExecutionContext context) : Ast.IVisitor
 {
     private Dictionary<string, object> _variables = new();
     
     private Stack<object> _stack = new();
+
+    private bool _break;
+    private bool _return;
 
     public void Run(Ast ast)
     {
@@ -186,6 +191,9 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
     {
         foreach (Ast.INode statement in node.Statements)
         {
+            if (_return || _break)
+                return;
+            
             statement.Accept(this);
         }
     }
@@ -201,7 +209,46 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
         {
             _stack.Push(el);
             _variables[node.IteratorName] = _stack.Pop();
-            node.Body.Accept(this);
+            
+            foreach (Ast.INode bodyStatement in node.Body.Statements)
+            {
+                if (_break)
+                {
+                    _break = false;
+                    return;
+                }
+                
+                bodyStatement.Accept(this);
+            }
         }
+    }
+
+    public void Visit(Ast.Nodes.Range node)
+    {
+        node.Start.Accept(this);
+        object first = _stack.Pop();
+        if (first is not IConvertible startConvertible)
+            throw LanguageException.RuntimeError($"Range start {first} is not a number");
+
+        node.End.Accept(this);
+        object second = _stack.Pop();
+        if (second is not IConvertible endConvertible)
+            throw LanguageException.RuntimeError($"Range end {second} is not a number");
+
+        int start = startConvertible.ToInt32(CultureInfo.InvariantCulture);
+        int end = endConvertible.ToInt32(CultureInfo.InvariantCulture);
+        IEnumerable<int> range = start <= end ? Enumerable.Range(start, end - start + 1)
+                                     : Enumerable.Range(end, start - end + 1).Reverse();
+
+        _stack.Push(range.Select(x => (double)x).Cast<object>().ToList());
+    }
+
+    public void Visit(Ast.Nodes.ExecutionFlag node)
+    {
+        if (node.Flag == "break")
+            _break = true;
+
+        if (node.Flag == "return")
+            _return = true;
     }
 }

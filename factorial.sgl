@@ -1,0 +1,12 @@
+﻿with n: number
+
+if n < 2
+    Print 1
+}
+
+factorial = 1
+for i in 2..n
+    factorial = factorial * i
+}
+
+Print factorial

@@ -49,7 +49,7 @@ public static class LanguageSpecification
     };
     public const int MaxPriority = 9;
 
-    public static HashSet<string> Keywords { get; } = ["if", "else", "for", "in", "with"];
+    public static HashSet<string> Keywords { get; } = ["if", "else", "for", "in", "with", "break", "return"];
     public static HashSet<string> Types { get; } = ["number", "string", "bool", "array", "object"];
 
     public static Dictionary<string, Func<List<object>, object>> StandardFunctions { get; } = new()
@@ -63,6 +63,8 @@ public static class LanguageSpecification
             ["IsString"] = args => args.All(o => o is string),
             ["IsArray"] = args => args.All(o => o is IList),
             ["IsBool"] = args => args.All(o => o is bool),
+            ["Sqrt"] = args => Math.Sqrt((double)args[0]),
+            ["Floor"] = args => Math.Floor((double)args[0]),
         };
 
     private static string NiceToString(object o)
@@ -91,11 +93,28 @@ public static class LanguageSpecification
 
                 return list[index];
             },
+            ["Set"] = (obj, args) =>
+            {
+                if (obj is not IList list)
+                    throw LanguageException.RuntimeError($"Cannot use 'set' method on non-list object {obj}");
+
+                if (args.Count is not 2)
+                    throw LanguageException.RuntimeError($"Cannot use 'set' method with {args.Count} arguments");
+
+                if (!int.TryParse(args[0].ToString(), out int index))
+                    throw LanguageException.RuntimeError($"Cannot use 'set' method with non-integer argument {args[0]}");
+                
+                if (index < 0 || index >= list.Count)
+                    throw LanguageException.RuntimeError($"Index {index} out of range {list.Count}");
+
+                list[index] = args[1];
+                return args[1];
+            },
             ["Count"] = (obj, _) =>
             {
                 if (obj is not IList list)
                     throw LanguageException.RuntimeError($"Cannot use 'len' method on non-list object {obj}");
-                return list.Count;
+                return (double)list.Count;
             },
             ["Add"] = (obj, args) =>
             {

@@ -1,0 +1,19 @@
+﻿with arr: array
+length = arr.Count
+
+for i in 1..length - 1
+    key = arr.At i
+    start = i - 1
+    
+    for j in start..0
+        cur = arr.At j
+        if (cur < key)
+            break
+        }
+        
+        arr.Set j + 1, cur
+        arr.Set j, key
+    }
+}
+
+Print arr

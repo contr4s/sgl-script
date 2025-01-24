@@ -40,4 +40,16 @@ public class ExecutionContext
         
         throw LanguageException.ContextError($"argument is not of type {typeof(T)}");
     }
+
+    public List<object> ConsumeArray()
+    {
+        object arg = _arguments.Dequeue();
+        if (arg is List<object> t)
+            return t;
+
+        if (arg is not string str)
+            throw LanguageException.ContextError("argument is not array");
+
+        return str[1..^1].Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => double.TryParse(x, CultureInfo.InvariantCulture, out double val) ? (object)val : x).ToList();
+    }
 }

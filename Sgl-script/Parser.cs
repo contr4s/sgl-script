@@ -87,6 +87,7 @@ public class Parser(Lexer lexer, ExecutionContext context)
                 "if" => Conditional(),
                 "for" => Loop(),
                 "with" => WithExpression(),
+                "break" or "return" => new Ast.Nodes.ExecutionFlag(keyword),
                 _    => throw LanguageException.SyntaxError(lexer.Line, $"Unexpected keyword {_currentToken.Value}")
             };
     }
@@ -202,7 +203,17 @@ public class Parser(Lexer lexer, ExecutionContext context)
             {
                 string name = _currentToken.Value;
                 Consume(TokenType.Identifier);
-                return new Ast.Nodes.Variable(name);
+                var variable = new Ast.Nodes.Variable(name);
+                
+                if (_currentToken.Type == TokenType.Dot)
+                {
+                    Consume(TokenType.Dot);
+                    Consume(TokenType.Dot);
+
+                    return new Ast.Nodes.Range(variable, Expression());
+                }
+                
+                return variable;
             }
 
             case TokenType.OpenParenthesis:
@@ -226,13 +237,16 @@ public class Parser(Lexer lexer, ExecutionContext context)
                 string[] split = value.Split('.', StringSplitOptions.RemoveEmptyEntries);
                 if (split.Length < 1 || !int.TryParse(split[0], out int start))
                     throw LanguageException.SyntaxError(lexer.Line, $"Invalid range start {value}");
-                if (split.Length < 2 || !int.TryParse(split[1], out int end))
+                
+                if (split.Length < 2)
+                {
+                    return new Ast.Nodes.Range(new Ast.Nodes.Literal<int>(start), Expression());
+                }
+
+                if (!int.TryParse(split[1], out int end))
                     throw LanguageException.SyntaxError(lexer.Line, $"Invalid range end {value}");
-
-                IEnumerable<int> range = start <= end ? Enumerable.Range(start, end - start + 1)
-                                             : Enumerable.Range(end, start - end + 1).Reverse();
-
-                return new Ast.Nodes.Array(range.Select(x => new Ast.Nodes.Literal<double>(x)).ToList());
+                    
+                return new Ast.Nodes.Range(new Ast.Nodes.Literal<int>(start), new Ast.Nodes.Literal<int>(end));
             }
                 
             case TokenType.Minus or TokenType.UnaryOperator:
@@ -285,7 +299,7 @@ public class Parser(Lexer lexer, ExecutionContext context)
                     "number" => GetFromContext<double>(),
                     "string" => GetFromContext<string>(),
                     "bool"   => GetFromContext<bool>(),
-                    "array"  => GetFromContext<List<object>>(),
+                    "array"  => new Ast.Nodes.Literal<List<object>>(context.ConsumeArray()),
                     "object" => GetFromContext<object>(),
                     _        => throw LanguageException.SyntaxError(lexer.Line, $"Invalid type {type}")
                 };

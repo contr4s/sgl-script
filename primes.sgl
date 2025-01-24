@@ -1,0 +1,28 @@
+﻿with n: number
+primes = [0, 0]
+for i in 2..n
+    primes.Add 1
+}
+
+sqrt = Sqrt n
+for i in 2..sqrt
+    cur = primes.At i
+    if cur > 0
+        end = Floor n / i
+        if end > i
+            for j in i..end
+                primes.Set j * i, 0
+            }
+        }
+    }
+}
+
+result = []
+for i in 2..n
+    cur = primes.At i
+    if cur > 0
+        result.Add i
+    }
+}
+
+Print result

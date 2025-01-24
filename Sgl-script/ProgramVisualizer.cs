@@ -167,4 +167,19 @@ public class ProgramVisualizer : Ast.IVisitor
         Console.WriteLine("Body");
         node.Body.Accept(this);
     }
+
+    public void Visit(Ast.Nodes.Range node)
+    {
+        Console.WriteLine("Range");
+        _indent += "  ";
+        _last = false;
+        Print(node.Start);
+        _last = true;
+        Print(node.End);
+    }
+
+    public void Visit(Ast.Nodes.ExecutionFlag node)
+    {
+        Console.WriteLine(node);
+    }
 }

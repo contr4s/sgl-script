@@ -22,6 +22,8 @@ public record Ast(Ast.Nodes.Compound Root)
         void Visit(Nodes.Conditional node);
         void Visit(Nodes.Compound node);
         void Visit(Nodes.Loop node);
+        void Visit(Nodes.Range node);
+        void Visit(Nodes.ExecutionFlag node);
     }
     
     public static class Nodes
@@ -77,6 +79,16 @@ public record Ast(Ast.Nodes.Compound Root)
         }
         
         public record Loop(string IteratorName, INode Iterable, Compound Body) : INode
+        {
+            public void Accept(IVisitor visitor) => visitor.Visit(this);
+        }
+        
+        public record Range(INode Start, INode End) : INode
+        {
+            public void Accept(IVisitor visitor) => visitor.Visit(this);
+        }
+
+        public record ExecutionFlag(string Flag) : INode
         {
             public void Accept(IVisitor visitor) => visitor.Visit(this);
         }
