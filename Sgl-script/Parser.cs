@@ -307,7 +307,7 @@ public class Parser(Lexer lexer, ExecutionContext context)
             
             if (_currentToken.Type is TokenType.NewLine)
             {
-                return new Ast.Nodes.Compound(statements);
+                return new Ast.Nodes.Compound(statements, false);
             }
 
             Consume(TokenType.Comma);

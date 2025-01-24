@@ -73,7 +73,7 @@ public record Ast(Ast.Nodes.Compound Root)
             public void Accept(IVisitor visitor) => visitor.Visit(this);
         }
         
-        public record Compound(IReadOnlyList<INode> Statements) : INode
+        public record Compound(IReadOnlyList<INode> Statements, bool CreateScope = true) : INode
         {
             public void Accept(IVisitor visitor) => visitor.Visit(this);
         }

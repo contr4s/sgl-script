@@ -4,12 +4,12 @@ namespace Sgl_script;
 
 public class Interpreter(ExecutionContext context) : Ast.IVisitor
 {
-    private Dictionary<string, object> _variables = new();
+    MemoryManager _memoryManager = new MemoryManager();
     
-    private Stack<object> _stack = new();
-
+    private Stack<object> _values = new();
+    
     private bool _break;
-    private bool _return;
+    private bool _return; 
 
     public void Run(Ast ast)
     {
@@ -19,7 +19,7 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
     public void Visit<T>(Ast.Nodes.Literal<T> node)
     {
         if (node.Value is not null)
-            _stack.Push(node.Value);
+            _values.Push(node.Value);
     }
 
     public void Visit(Ast.Nodes.Array node)
@@ -30,26 +30,23 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
 
         for (int i = 0; i < node.Elements.Count; i++)
         {
-            array.Add(_stack.Pop());
+            array.Add(_values.Pop());
         }
         array.Reverse();
-        _stack.Push(array);
+        _values.Push(array);
     }
 
     public void Visit(Ast.Nodes.Variable node)
     {
-        if (_variables.TryGetValue(node.Name, out var value))
-            _stack.Push(value);
-        else
-            throw LanguageException.RuntimeError($"Variable {node.Name} is not defined");
+        _values.Push(_memoryManager.GetValue(node.Name));
     }
 
     public void Visit(Ast.Nodes.BinaryOperator node)
     {
         node.Left.Accept(this);
-        var left = _stack.Pop();
+        var left = _values.Pop();
         node.Right.Accept(this);
-        var right = _stack.Pop();
+        var right = _values.Pop();
 
         object res = node.Operator switch
             {
@@ -84,7 +81,7 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
                 "=" or "<" or ">" => throw LanguageException.RuntimeError($"Cannot compare {left} and {right}"),
                 _                 => throw LanguageException.RuntimeError($"Unknown operator {node.Operator}")
             };
-        _stack.Push(res);
+        _values.Push(res);
     }
     
     private List<object> Add(List<object> left, object right)
@@ -121,7 +118,7 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
     public void Visit(Ast.Nodes.UnaryOperator node)
     {
         node.Expression.Accept(this);
-        var value = _stack.Pop();
+        var value = _values.Pop();
         
         object res = node.Operator switch
         {
@@ -132,13 +129,13 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
             "not" => throw LanguageException.RuntimeError($"Cannot negate (not) {value}"),
             _ => throw LanguageException.RuntimeError($"Unknown operator {node.Operator}")
         };
-        _stack.Push(res);
+        _values.Push(res);
     }
 
     public void Visit(Ast.Nodes.Assignment node)
     {
         node.Expression.Accept(this);
-        _variables[node.Variable] = _stack.Pop();
+        _memoryManager.Allocate(node.Variable, _values.Pop());
     }
 
     public void Visit(Ast.Nodes.FunctionCall node)
@@ -148,7 +145,7 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
         
         object? res = context.ExecuteFunction(node.Name, PrepareArguments(node.Arguments));
         if (res is not null)
-            _stack.Push(res);
+            _values.Push(res);
     }
 
     private List<object> PrepareArguments(IReadOnlyList<Ast.INode> arguments)
@@ -157,7 +154,7 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
         foreach (var argument in arguments)
         {
             argument.Accept(this);
-            args.Add(_stack.Pop());
+            args.Add(_values.Pop());
         }
 
         return args;
@@ -169,15 +166,15 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
             throw LanguageException.RuntimeError($"Method {node.Name} is not defined");
         
         node.Variable.Accept(this);
-        object? res = context.ExecuteMethod(_stack.Pop(), node.Name, PrepareArguments(node.Arguments));
+        object? res = context.ExecuteMethod(_values.Pop(), node.Name, PrepareArguments(node.Arguments));
         if (res is not null)
-            _stack.Push(res);
+            _values.Push(res);
     }
 
     public void Visit(Ast.Nodes.Conditional node)
     {
         node.Condition.Accept(this);
-        var value = _stack.Pop();
+        var value = _values.Pop();
         if (value is not bool b)
             throw LanguageException.RuntimeError($"Cannot evaluate {value} as a boolean");
 
@@ -189,6 +186,9 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
 
     public void Visit(Ast.Nodes.Compound node)
     {
+        if (node.CreateScope)
+            _memoryManager.EnterScope();
+        
         foreach (Ast.INode statement in node.Statements)
         {
             if (_return || _break)
@@ -196,19 +196,22 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
             
             statement.Accept(this);
         }
+        
+        if (node.CreateScope)
+            _memoryManager.ExitScope();
     }
 
     public void Visit(Ast.Nodes.Loop node)
     {
         node.Iterable.Accept(this);
-        var iterable = _stack.Pop();
+        var iterable = _values.Pop();
         if (iterable is not List<object> list)
             throw LanguageException.RuntimeError($"Cannot iterate over {iterable}");
 
         foreach (var el in list)
         {
-            _stack.Push(el);
-            _variables[node.IteratorName] = _stack.Pop();
+            _values.Push(el);
+            _memoryManager.Allocate(node.IteratorName, _values.Pop());
             
             foreach (Ast.INode bodyStatement in node.Body.Statements)
             {
@@ -226,12 +229,12 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
     public void Visit(Ast.Nodes.Range node)
     {
         node.Start.Accept(this);
-        object first = _stack.Pop();
+        object first = _values.Pop();
         if (first is not IConvertible startConvertible)
             throw LanguageException.RuntimeError($"Range start {first} is not a number");
 
         node.End.Accept(this);
-        object second = _stack.Pop();
+        object second = _values.Pop();
         if (second is not IConvertible endConvertible)
             throw LanguageException.RuntimeError($"Range end {second} is not a number");
 
@@ -240,7 +243,7 @@ public class Interpreter(ExecutionContext context) : Ast.IVisitor
         IEnumerable<int> range = start <= end ? Enumerable.Range(start, end - start + 1)
                                      : Enumerable.Range(end, start - end + 1).Reverse();
 
-        _stack.Push(range.Select(x => (double)x).Cast<object>().ToList());
+        _values.Push(range.Select(x => (double)x).Cast<object>().ToList());
     }
 
     public void Visit(Ast.Nodes.ExecutionFlag node)
