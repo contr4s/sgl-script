@@ -41,12 +41,23 @@ public class Lexer(string input)
     {
         if (_position >= input.Length)
             return new Token(TokenType.EndOfFile, "");
-        
-        (string _, int offset) = SkipWhile(c => c is ' ' or '\t' or '\r', 0);
-        
-        if (_position >= input.Length)
-            return new Token(TokenType.EndOfFile, "");
-        
+
+        int offset = 0;
+        while (true)
+        {
+            (string _, int wsOffset) = SkipWhile(c => c is ' ' or '\t' or '\r', offset);
+            offset = wsOffset;
+
+            if (_position + offset >= input.Length)
+                return new Token(TokenType.EndOfFile, "");
+
+            if (input[_position + offset] != '#')
+                break;
+
+            (string _, int commentOffset) = SkipWhile(c => c != '\n', offset);
+            offset = commentOffset;
+        }
+
         char currentChar = input[_position + offset];
 
         if (currentChar is '\n')
@@ -91,8 +102,19 @@ public class Lexer(string input)
     {
         if (_position >= input.Length)
             return new Token(TokenType.EndOfFile, "");
-        
-        PeekWhile(c => c is ' ' or '\t' or '\r');
+
+        while (true)
+        {
+            PeekWhile(c => c is ' ' or '\t' or '\r');
+
+            if (_position >= input.Length)
+                return new Token(TokenType.EndOfFile, "");
+
+            if (input[_position] != '#')
+                break;
+
+            PeekWhile(c => c != '\n');
+        }
         
         if (_position >= input.Length)
             return new Token(TokenType.EndOfFile, "");
